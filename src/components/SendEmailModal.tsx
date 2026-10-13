@@ -69,7 +69,7 @@ ${invoice.sender.email || ''}`;
       // Pre-generate PDF for attachment
       if (previewElement) {
         setIsGeneratingPdf(true);
-        generateInvoicePdf(previewElement, `${invoice.invoiceNumber}.pdf`)
+        generateInvoicePdf(previewElement, `${invoice.invoiceNumber}.pdf`, invoice)
           .then((res) => {
             setPdfBlob(res.blob);
             setPdfSizeKb(res.sizeKb);

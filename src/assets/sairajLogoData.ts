@@ -206,3 +206,38 @@ function getBase64Svg(rawSvg: string): string {
 
 export const SAIRAJ_LOGO_DATA_URL = getBase64Svg(SAIRAJ_LOGO_SVG_RAW);
 
+let cachedPngDataUrl: string | null = null;
+
+export async function getSairajLogoPngDataUrl(): Promise<string> {
+  if (cachedPngDataUrl) return cachedPngDataUrl;
+  if (typeof window === 'undefined') return SAIRAJ_LOGO_DATA_URL;
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 400;
+          canvas.height = 400;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, 400, 400);
+            cachedPngDataUrl = canvas.toDataURL('image/png');
+            resolve(cachedPngDataUrl);
+            return;
+          }
+        } catch (e) {
+          console.warn('Canvas rasterization error:', e);
+        }
+        resolve(SAIRAJ_LOGO_DATA_URL);
+      };
+      img.onerror = () => resolve(SAIRAJ_LOGO_DATA_URL);
+      img.src = SAIRAJ_LOGO_DATA_URL;
+    } catch {
+      resolve(SAIRAJ_LOGO_DATA_URL);
+    }
+  });
+}
+

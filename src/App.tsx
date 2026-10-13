@@ -302,14 +302,12 @@ export default function App() {
       const filename = `${activeInvoice.invoiceNumber || 'Invoice'}.pdf`;
       // Prioritize the dedicated offscreen unscaled container for 100% reliable capture
       const targetElement = offscreenPdfRef.current || invoiceCaptureRef.current;
-      await downloadInvoicePdf(targetElement, filename);
+      await downloadInvoicePdf(targetElement, filename, activeInvoice);
       showToast(`Downloaded ${filename} successfully!`);
     } catch (err) {
       console.error('Failed to generate PDF:', err);
-      // Automatic fallback to browser print dialog
-      if (confirm('PDF download encountered a browser rendering issue. Would you like to use Print to PDF instead?')) {
-        window.print();
-      }
+      showToast('Opening print dialog to save as PDF...');
+      window.print();
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -640,17 +638,17 @@ export default function App() {
       <div
         id="permanent-pdf-render-host"
         aria-hidden="true"
-        className="no-print"
         style={{
           position: 'fixed',
-          left: '-9999px',
+          left: 0,
           top: 0,
           width: '794px',
           minHeight: '1080px',
           backgroundColor: '#ffffff',
-          overflow: 'visible',
+          overflow: 'hidden',
           pointerEvents: 'none',
           zIndex: -9999,
+          opacity: 0.001,
         }}
       >
         <div
