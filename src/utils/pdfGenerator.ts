@@ -9,24 +9,78 @@ export interface GeneratedPdfResult {
 }
 
 /**
+ * Pre-load all images inside an element to ensure html2canvas captures them without error.
+ */
+async function preloadImages(element: HTMLElement): Promise<void> {
+  const images = Array.from(element.querySelectorAll('img'));
+  await Promise.all(
+    images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        // Fallback timeout in case image loading stalls
+        setTimeout(resolve, 500);
+      });
+    })
+  );
+}
+
+/**
  * Capture an invoice DOM element and generate a high-definition A4 PDF.
  */
 export async function generateInvoicePdf(
-  element: HTMLElement,
+  sourceElement?: HTMLElement | null,
   filename: string = 'invoice.pdf'
 ): Promise<GeneratedPdfResult> {
-  // Ensure the target element is visible and styled properly
+  // 1. Locate the best target element
+  let element = sourceElement;
+  if (!element || element.offsetWidth === 0 || element.offsetHeight === 0) {
+    // Check for the offscreen capture container
+    const offscreen = document.getElementById('offscreen-invoice-capture');
+    if (offscreen && offscreen.offsetWidth > 0) {
+      element = offscreen;
+    } else {
+      // Check visible container
+      const container = document.getElementById('invoice-capture-container');
+      if (container && container.offsetWidth > 0) {
+        element = container;
+      }
+    }
+  }
+
+  if (!element) {
+    throw new Error('Invoice container could not be found for PDF capture.');
+  }
+
+  // 2. Pre-load images
+  await preloadImages(element);
+
+  // 3. Render via html2canvas with defensive options
   const canvas = await html2canvas(element, {
-    scale: 2.5, // 2.5x resolution for crisp text and print rendering
+    scale: 2, // 2x gives 300 DPI print quality without memory overflow
     useCORS: true,
+    allowTaint: true,
     logging: false,
     backgroundColor: '#ffffff',
-    windowWidth: element.scrollWidth,
+    width: 794,
+    windowWidth: 794,
+    onclone: (clonedDoc, clonedElement) => {
+      // Ensure cloned element is clean, unscaled, and visible
+      clonedElement.style.transform = 'none';
+      clonedElement.style.position = 'static';
+      clonedElement.style.left = 'auto';
+      clonedElement.style.top = 'auto';
+      clonedElement.style.display = 'block';
+      clonedElement.style.visibility = 'visible';
+      clonedElement.style.width = '794px';
+      clonedElement.style.margin = '0 auto';
+    },
   });
 
-  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-  // A4 dimensions in mm: 210 x 297
+  // 4. A4 dimensions in mm: 210 x 297
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -45,7 +99,7 @@ export async function generateInvoicePdf(
   pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
   heightLeft -= pageHeight;
 
-  // Multi-page handling if content is long
+  // Multi-page handling if content overflows single A4 page
   while (heightLeft > 5) {
     position = heightLeft - imgHeight;
     pdf.addPage();
@@ -68,9 +122,12 @@ export async function generateInvoicePdf(
 /**
  * Directly download invoice PDF to the user's computer.
  */
-export async function downloadInvoicePdf(element: HTMLElement, filename: string): Promise<GeneratedPdfResult> {
+export async function downloadInvoicePdf(
+  element?: HTMLElement | null,
+  filename: string = 'invoice.pdf'
+): Promise<GeneratedPdfResult> {
   const result = await generateInvoicePdf(element, filename);
-  
+
   // Create download anchor
   const link = document.createElement('a');
   link.href = URL.createObjectURL(result.blob);
@@ -80,7 +137,7 @@ export async function downloadInvoicePdf(element: HTMLElement, filename: string)
   document.body.removeChild(link);
 
   // Revoke object URL after delay
-  setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+  setTimeout(() => URL.revokeObjectURL(link.href), 15000);
 
   return result;
 }

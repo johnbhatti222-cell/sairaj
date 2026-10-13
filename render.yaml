@@ -1,0 +1,11 @@
+services:
+  # Static Site Deployment (Recommended for Vite React SPA: Free, Fast, No cold starts)
+  - type: web
+    name: sairaj-invoice-generator
+    env: static
+    buildCommand: npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

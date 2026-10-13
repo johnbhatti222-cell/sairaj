@@ -85,6 +85,8 @@ export default function App() {
 
   // Ref to the rendered invoice element in preview
   const invoiceCaptureRef = useRef<HTMLDivElement>(null);
+  // Dedicated permanent offscreen capture ref (always mounted, unscaled, positive dimensions)
+  const offscreenPdfRef = useRef<HTMLDivElement>(null);
 
   // Get currently active invoice
   const activeInvoice = invoices.find((inv) => inv.id === activeInvoiceId) || invoices[0] || SAMPLE_INVOICES[0];
@@ -295,15 +297,19 @@ export default function App() {
 
   // Direct PDF Download Handler
   const handleDownloadPdf = async () => {
-    if (!invoiceCaptureRef.current) return;
     setIsDownloadingPdf(true);
     try {
       const filename = `${activeInvoice.invoiceNumber || 'Invoice'}.pdf`;
-      await downloadInvoicePdf(invoiceCaptureRef.current, filename);
+      // Prioritize the dedicated offscreen unscaled container for 100% reliable capture
+      const targetElement = offscreenPdfRef.current || invoiceCaptureRef.current;
+      await downloadInvoicePdf(targetElement, filename);
       showToast(`Downloaded ${filename} successfully!`);
     } catch (err) {
       console.error('Failed to generate PDF:', err);
-      alert('PDF generation encountered an error. Please try browser print instead.');
+      // Automatic fallback to browser print dialog
+      if (confirm('PDF download encountered a browser rendering issue. Would you like to use Print to PDF instead?')) {
+        window.print();
+      }
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -621,7 +627,7 @@ export default function App() {
       {/* Modal: Send Invoice via Email */}
       <SendEmailModal
         invoice={activeInvoice}
-        previewElement={invoiceCaptureRef.current}
+        previewElement={offscreenPdfRef.current || invoiceCaptureRef.current}
         isOpen={isSendEmailOpen}
         onClose={() => setIsSendEmailOpen(false)}
         onInvoiceSent={(updated) => {
@@ -629,6 +635,36 @@ export default function App() {
           showToast(`Invoice dispatched to ${updated.client.email}`);
         }}
       />
+
+      {/* Permanent Offscreen PDF Capture Host (Always mounted, unscaled 794px, 100% reliable) */}
+      <div
+        id="permanent-pdf-render-host"
+        aria-hidden="true"
+        className="no-print"
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          width: '794px',
+          minHeight: '1080px',
+          backgroundColor: '#ffffff',
+          overflow: 'visible',
+          pointerEvents: 'none',
+          zIndex: -9999,
+        }}
+      >
+        <div
+          ref={offscreenPdfRef}
+          id="offscreen-invoice-capture"
+          className="bg-white w-[794px] min-h-[1080px] text-slate-800"
+          style={{ transform: 'none' }}
+        >
+          <InvoicePreview
+            invoice={activeInvoice}
+            zoom={1}
+          />
+        </div>
+      </div>
 
       {/* Subtle Toast Feedback */}
       {toastMessage && (

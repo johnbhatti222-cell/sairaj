@@ -193,4 +193,16 @@ export const SAIRAJ_LOGO_SVG_RAW = `<svg xmlns="http://www.w3.org/2000/svg" view
   </g>
 </svg>`;
 
-export const SAIRAJ_LOGO_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(SAIRAJ_LOGO_SVG_RAW)}`;
+function getBase64Svg(rawSvg: string): string {
+  try {
+    if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+      return `data:image/svg+xml;base64,${window.btoa(unescape(encodeURIComponent(rawSvg)))}`;
+    }
+  } catch (e) {
+    console.error('Base64 encode error:', e);
+  }
+  return `data:image/svg+xml;utf8,${encodeURIComponent(rawSvg)}`;
+}
+
+export const SAIRAJ_LOGO_DATA_URL = getBase64Svg(SAIRAJ_LOGO_SVG_RAW);
+
